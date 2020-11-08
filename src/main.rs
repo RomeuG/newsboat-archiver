@@ -1,83 +1,62 @@
-use chrono::{DateTime, TimeZone, Utc};
+mod feed;
+mod feeditem;
+
+use feed::*;
+use feeditem::*;
+
 use sqlite;
 
-#[derive(Debug)]
-struct Feed {
-    rssurl: Option<String>,
-    url: Option<String>,
-    title: Option<String>,
-    lastmodified: Option<DateTime<Utc>>,
-    is_rtl: Option<bool>,
-    etag: Option<String>,
-}
-
-impl Feed {
-    fn from_tuple_array(ta: &[(&str, Option<&str>)]) -> Feed {
-        let feed = Feed {
-            rssurl: ta[0].1.map(|s| s.to_string()),
-            url: ta[1].1.map(|s| s.to_string()),
-            title: ta[2].1.map(|s| s.to_string()),
-            lastmodified: ta[3].1.map(|s| Utc.timestamp(s.parse::<i64>().unwrap(), 0)),
-            is_rtl: ta[4].1.map(|s| s != "0"),
-            etag: ta[5].1.map(|s| s.to_string()),
-        };
-
-        return feed;
-    }
-}
-
-impl ToString for Feed {
-    fn to_string(&self) -> String {
-        return format!("{:?}", self);
-    }
-}
+use std::fs::File;
+use std::io::{self, BufRead};
+use std::path::Path;
 #[derive(Debug, Clone)]
-struct FeedItem {
-    id: Option<u32>,
-    guid: Option<String>,
-    title: Option<String>,
-    author: Option<String>,
-    url: Option<String>,
-    feedurl: Option<String>,
-    pubdate: Option<DateTime<Utc>>,
-    content: Option<String>,
-    unread: Option<bool>,
-    enclosure_url: Option<String>,
-    enclosure_type: Option<String>,
-    enqueued: Option<String>,
-    flags: Option<String>,
-    deleted: Option<bool>,
-    base: Option<String>,
+struct Setting {
+    url: String,
+    args: String,
 }
 
-impl FeedItem {
-    fn from_tuple_array(ta: &[(&str, Option<&str>)]) -> FeedItem {
-        let feed_item = FeedItem {
-            id: ta[0].1.map(|s| s.parse::<u32>().unwrap()),
-            guid: ta[1].1.map(|s| s.to_string()),
-            title: ta[2].1.map(|s| s.to_string()),
-            author: ta[3].1.map(|s| s.to_string()),
-            url: ta[4].1.map(|s| s.to_string()),
-            feedurl: ta[5].1.map(|s| s.to_string()),
-            pubdate: ta[6].1.map(|s| Utc.timestamp(s.parse::<i64>().unwrap(), 0)),
-            content: ta[7].1.map(|s| s.to_string()),
-            unread: ta[8].1.map(|s| s == "0"),
-            enclosure_url: ta[9].1.map(|s| s.to_string()),
-            enclosure_type: ta[10].1.map(|s| s.to_string()),
-            enqueued: ta[11].1.map(|s| s.to_string()),
-            flags: ta[12].1.map(|s| s.to_string()),
-            deleted: ta[13].1.map(|s| s == "1"),
-            base: ta[14].1.map(|s| s.to_string()),
-        };
-
-        return feed_item;
-    }
+fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+where
+    P: AsRef<Path>,
+{
+    let file = File::open(filename)?;
+    Ok(io::BufReader::new(file).lines())
 }
 
-impl ToString for FeedItem {
-    fn to_string(&self) -> String {
-        return format!("{:?}", self);
+fn get_black_list() -> Vec<String> {
+    let mut list: Vec<String> = vec![];
+
+    if let Ok(lines) = read_lines("blacklist.conf") {
+        for line in lines {
+            if let Ok(content) = line {
+                list.push(content);
+            }
+        }
     }
+
+    return list;
+}
+
+fn get_settings() -> Vec<Setting> {
+    let mut list: Vec<Setting> = vec![];
+
+    if let Ok(lines) = read_lines("settings.conf") {
+        for line in lines {
+            if let Ok(content) = line {
+                let split = content.split("|").collect::<Vec<_>>();
+
+                if split.len() == 2 {
+                    let setting = Setting {
+                        url: split[0].to_string(),
+                        args: split[1].to_string(),
+                    };
+                    list.push(setting);
+                }
+            }
+        }
+    }
+
+    return list;
 }
 
 fn db_get_feed(dbcon: &sqlite::Connection) -> Vec<Feed> {
@@ -110,14 +89,8 @@ fn db_get_feed_items(dbcon: &sqlite::Connection) -> Vec<FeedItem> {
     return feed_item_list;
 }
 
-// fn myfunc<'a>(mut strings: impl Iterator<Item=&'a str>, key: &'a str) -> bool {
-//         strings.any(|item| key.contains(item))
-// }
-
-const URL_BLACKLIST: [&'static str; 2] = ["https://www.youtube.com/", "https://nitter.net/"];
-
-fn is_url_in_blacklist<'a>(url: &'a str) -> bool {
-    for blacklisted in &URL_BLACKLIST {
+fn is_url_in_blacklist<'a>(url: &'a str, list: &Vec<String>) -> bool {
+    for blacklisted in list {
         if url.contains(blacklisted) {
             return true;
         }
@@ -126,15 +99,14 @@ fn is_url_in_blacklist<'a>(url: &'a str) -> bool {
     return false;
 }
 
-fn str_sanitize(s: String) -> String {
-    return s
-        .replace(" ", "-")
-        .replace(",", "")
-        .replace(":", "")
-        .replace("(", "")
-        .replace(")", "")
-        .replace("'", "")
-        .replace("*", "");
+fn get_setting_from_url(url: String, list: &Vec<Setting>) -> String {
+    for setting in list {
+        if url.contains(&setting.url) {
+            return setting.args.clone();
+        }
+    }
+
+    return "s".to_string();
 }
 
 pub trait StringExtensions {
@@ -201,6 +173,10 @@ fn main() {
         std::process::exit(-1);
     }
 
+    // get lists
+    let blacklist = get_black_list();
+    let settings = get_settings();
+
     // e.g.: /home/romeu/.local/share/newsboat/cache.db
     let connection = sqlite::open(arg_db).unwrap();
 
@@ -212,7 +188,7 @@ fn main() {
         let feed_rssurl = feed.rssurl.unwrap();
         let feed_title = feed.title.unwrap().sanitize();
 
-        if is_url_in_blacklist(&feed_url) {
+        if is_url_in_blacklist(&feed_url, &blacklist) {
             continue;
         }
 
@@ -234,7 +210,9 @@ fn main() {
             let title = item.title.clone().unwrap().sanitize();
 
             let url = item.url.as_ref().unwrap();
-            let monolith = format!("monolith -s {} > {}/{}.html", url, feed_dir, title);
+            let args = get_setting_from_url(url.clone(), &settings);
+
+            let monolith = format!("monolith -{} {} > {}/{}.html", args, url, feed_dir, title);
 
             println!("Command to execute: {}", monolith);
 
