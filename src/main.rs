@@ -9,10 +9,26 @@ use sqlite;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-#[derive(Debug, Clone)]
+
+#[derive(Debug, Clone, Default)]
 struct Setting {
+    cmd: String,
     url: String,
-    args: String,
+    args: String
+}
+
+impl Setting {
+    fn is_empty(&self) -> bool {
+        return self.cmd.is_empty() && self.url.is_empty() && self.args.is_empty()
+    }
+
+    // fn empty() -> Setting {
+    //     return Setting {
+    //         cmd: "".to_string(),
+    //         url: "".to_string(),
+    //         args: "".to_string()
+    //     }
+    // }
 }
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
@@ -23,7 +39,7 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
-fn get_black_list() -> Vec<String> {
+fn get_blacklist() -> Vec<String> {
     let mut list: Vec<String> = vec![];
 
     if let Ok(lines) = read_lines("blacklist.conf") {
@@ -45,10 +61,11 @@ fn get_settings() -> Vec<Setting> {
             if let Ok(content) = line {
                 let split = content.split("|").collect::<Vec<_>>();
 
-                if split.len() == 2 {
+                if split.len() == 3 {
                     let setting = Setting {
-                        url: split[0].to_string(),
-                        args: split[1].to_string(),
+                        cmd: split[0].to_string(),
+                        url: split[1].to_string(),
+                        args: split[2].to_string()
                     };
                     list.push(setting);
                 }
@@ -89,7 +106,7 @@ fn db_get_feed_items(dbcon: &sqlite::Connection) -> Vec<FeedItem> {
     return feed_item_list;
 }
 
-fn is_url_in_blacklist<'a>(url: &'a str, list: &Vec<String>) -> bool {
+fn is_url_in_blacklist<'a>(url: &'a str, list: &[String]) -> bool {
     for blacklisted in list {
         if url.contains(blacklisted) {
             return true;
@@ -99,20 +116,22 @@ fn is_url_in_blacklist<'a>(url: &'a str, list: &Vec<String>) -> bool {
     return false;
 }
 
-fn get_setting_from_url(url: String, list: &Vec<Setting>) -> String {
+fn get_setting_from_url(url: String, list: &Vec<Setting>) -> Setting {
     for setting in list {
         if url.contains(&setting.url) {
-            return setting.args.clone();
+            return setting.clone()
         }
     }
 
-    return "s".to_string();
+    // return Setting::empty();
+    return Setting::default();
 }
 
 pub trait StringExtensions {
     fn sanitize(&mut self) -> String;
 }
 
+// TODO: try
 impl StringExtensions for String {
     fn sanitize(&mut self) -> String {
         return self
@@ -163,18 +182,15 @@ fn main() {
         .get_matches();
 
     let arg_db = args.value_of("File").expect("File argument not valid!");
-    let arg_directory = args
-        .value_of("Output")
-        .expect("Directory argument is not valid!");
+    let arg_directory = args.value_of("Output").expect("Directory argument is not valid!");
 
     let dir_metadata = std::fs::metadata(arg_directory).unwrap();
     if !dir_metadata.is_dir() {
-        println!("Invalid path: not a directory!\n");
-        std::process::exit(-1);
+        panic!("Invalid path: not a directory!\n");
     }
 
     // get lists
-    let blacklist = get_black_list();
+    let blacklist = get_blacklist();
     let settings = get_settings();
 
     // e.g.: /home/romeu/.local/share/newsboat/cache.db
@@ -210,16 +226,29 @@ fn main() {
             let title = item.title.clone().unwrap().sanitize();
 
             let url = item.url.as_ref().unwrap();
-            let args = get_setting_from_url(url.clone(), &settings);
+            let setting = get_setting_from_url(url.clone(), &settings);
 
-            let monolith = format!("monolith -{} {} > {}/{}.html", args, url, feed_dir, title);
+            println!("Setting found: {:?}", setting);
 
-            println!("Command to execute: {}", monolith);
+            let cmd: String;
+            if setting.is_empty() {
+                cmd = format!("monolith -s {} > {}/{}.html", url, feed_dir, title);
+            } else {
+                if setting.cmd == "monolith" {
+                    cmd = format!("monolith -{} {} > {}/{}.html", setting.args, url, feed_dir, title);
+                } else if setting.cmd == "lynx" {
+                    cmd = format!("lynx {} -dump > {}/{}.txt", url, feed_dir, title);
+                } else {
+                    cmd = format!("monolith -s {} > {}/{}.html", url, feed_dir, title);
+                }
+            }
+
+            println!("Command to execute: {}", cmd);
 
             // use `output()` to block
             std::process::Command::new("sh")
                 .arg("-c")
-                .arg(monolith)
+                .arg(cmd)
                 .output()
                 .expect("Failed to execute monolith.");
         }
