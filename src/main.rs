@@ -14,12 +14,12 @@ use std::path::Path;
 struct Setting {
     cmd: String,
     url: String,
-    args: String
+    args: String,
 }
 
 impl Setting {
     fn is_empty(&self) -> bool {
-        return self.cmd.is_empty() && self.url.is_empty() && self.args.is_empty()
+        return self.cmd.is_empty() && self.url.is_empty() && self.args.is_empty();
     }
 
     // fn empty() -> Setting {
@@ -65,7 +65,7 @@ fn get_settings() -> Vec<Setting> {
                     let setting = Setting {
                         cmd: split[0].to_string(),
                         url: split[1].to_string(),
-                        args: split[2].to_string()
+                        args: split[2].to_string(),
                     };
                     list.push(setting);
                 }
@@ -119,7 +119,7 @@ fn is_url_in_blacklist<'a>(url: &'a str, list: &[String]) -> bool {
 fn get_setting_from_url(url: String, list: &Vec<Setting>) -> Setting {
     for setting in list {
         if url.contains(&setting.url) {
-            return setting.clone()
+            return setting.clone();
         }
     }
 
@@ -182,7 +182,9 @@ fn main() {
         .get_matches();
 
     let arg_db = args.value_of("File").expect("File argument not valid!");
-    let arg_directory = args.value_of("Output").expect("Directory argument is not valid!");
+    let arg_directory = args
+        .value_of("Output")
+        .expect("Directory argument is not valid!");
 
     let dir_metadata = std::fs::metadata(arg_directory).unwrap();
     if !dir_metadata.is_dir() {
@@ -235,7 +237,10 @@ fn main() {
                 cmd = format!("monolith -s {} > {}/{}.html", url, feed_dir, title);
             } else {
                 if setting.cmd == "monolith" {
-                    cmd = format!("monolith -{} {} > {}/{}.html", setting.args, url, feed_dir, title);
+                    cmd = format!(
+                        "monolith -{} {} > {}/{}.html",
+                        setting.args, url, feed_dir, title
+                    );
                 } else if setting.cmd == "lynx" {
                     cmd = format!("lynx {} -dump > {}/{}.txt", url, feed_dir, title);
                 } else {
