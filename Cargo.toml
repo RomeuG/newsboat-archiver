@@ -10,12 +10,13 @@ edition = "2018"
 sqlite = "0.25.3"
 chrono = "0.4"
 clap = "2.33.3"
-scraper = "0.12.0"
 
 [profile.dev]
 opt-level = 0
 debug = true
 
 [profile.release]
-opt-level = 3
-debug = false
+opt-level = 'z'  # Optimize for size.
+lto = true
+panic = 'abort'
+codegen-units = 1

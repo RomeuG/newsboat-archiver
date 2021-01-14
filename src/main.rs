@@ -21,14 +21,6 @@ impl Setting {
     fn is_empty(&self) -> bool {
         return self.cmd.is_empty() && self.url.is_empty() && self.args.is_empty();
     }
-
-    // fn empty() -> Setting {
-    //     return Setting {
-    //         cmd: "".to_string(),
-    //         url: "".to_string(),
-    //         args: "".to_string()
-    //     }
-    // }
 }
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
@@ -116,14 +108,13 @@ fn is_url_in_blacklist<'a>(url: &'a str, list: &[String]) -> bool {
     return false;
 }
 
-fn get_setting_from_url(url: String, list: &Vec<Setting>) -> Setting {
+fn get_setting_from_url(url: &str, list: &[Setting]) -> Setting {
     for setting in list {
         if url.contains(&setting.url) {
             return setting.clone();
         }
     }
 
-    // return Setting::empty();
     return Setting::default();
 }
 
@@ -195,7 +186,7 @@ fn main() {
     let blacklist = get_blacklist();
     let settings = get_settings();
 
-    // e.g.: /home/romeu/.local/share/newsboat/cache.db
+    // e.g.: /home/user/.local/share/newsboat/cache.db
     let connection = sqlite::open(arg_db).unwrap();
 
     let feed_list = db_get_feed(&connection);
@@ -214,13 +205,11 @@ fn main() {
         let feed_dir = format!("{}/{}", arg_directory, feed_title);
         std::fs::create_dir(&feed_dir).expect("Directory could not be created.");
 
-        let feed_item_list_clone = feed_item_list.clone();
-
-        let items = feed_item_list_clone
+        let items = feed_item_list
             .iter()
             .filter(|item| {
-                item.feedurl.clone().unwrap().contains(&feed_url)
-                    || item.feedurl.clone().unwrap().contains(&feed_rssurl)
+                item.feedurl.as_ref().unwrap().contains(&feed_url)
+                    || item.feedurl.as_ref().unwrap().contains(&feed_rssurl)
             })
             .collect::<Vec<_>>();
 
@@ -228,7 +217,7 @@ fn main() {
             let title = item.title.clone().unwrap().sanitize();
 
             let url = item.url.as_ref().unwrap();
-            let setting = get_setting_from_url(url.clone(), &settings);
+            let setting = get_setting_from_url(&url, &settings);
 
             println!("Setting found: {:?}", setting);
 
