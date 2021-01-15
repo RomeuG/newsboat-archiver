@@ -10,17 +10,11 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct Setting {
     cmd: String,
     url: String,
     args: String,
-}
-
-impl Setting {
-    fn is_empty(&self) -> bool {
-        return self.cmd.is_empty() && self.url.is_empty() && self.args.is_empty();
-    }
 }
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
@@ -108,14 +102,14 @@ fn is_url_in_blacklist<'a>(url: &'a str, list: &[String]) -> bool {
     return false;
 }
 
-fn get_setting_from_url(url: &str, list: &[Setting]) -> Setting {
+fn get_setting_from_url<'a>(url: &str, list: &'a[Setting]) -> Result<&'a Setting, ()> {
     for setting in list {
         if url.contains(&setting.url) {
-            return setting.clone();
+            return Ok(&setting);
         }
     }
 
-    return Setting::default();
+    Err(())
 }
 
 pub trait StringExtensions {
@@ -218,21 +212,23 @@ fn main() {
 
             let url = item.url.as_ref().unwrap();
             let setting = get_setting_from_url(&url, &settings);
-
             println!("Setting found: {:?}", setting);
 
             let cmd: String;
-            if setting.is_empty() {
-                cmd = format!("monolith -s {} > {}/{}.html", url, feed_dir, title);
-            } else {
-                if setting.cmd == "monolith" {
-                    cmd = format!(
-                        "monolith -{} {} > {}/{}.html",
-                        setting.args, url, feed_dir, title
-                    );
-                } else if setting.cmd == "lynx" {
-                    cmd = format!("lynx {} -dump > {}/{}.txt", url, feed_dir, title);
-                } else {
+            match setting {
+                Ok(s) => {
+                    if s.cmd == "monolith" {
+                        cmd = format!(
+                            "monolith -{} {} > {}/{}.html",
+                            s.args, url, feed_dir, title
+                        );
+                    } else if s.cmd == "lynx" {
+                        cmd = format!("lynx {} -dump > {}/{}.txt", url, feed_dir, title);
+                    } else {
+                        cmd = format!("monolith -s {} > {}/{}.html", url, feed_dir, title);
+                    }
+                },
+                Err(_) => {
                     cmd = format!("monolith -s {} > {}/{}.html", url, feed_dir, title);
                 }
             }
