@@ -116,11 +116,13 @@ pub trait StringExtensions {
     fn sanitize(&mut self) -> String;
 }
 
-// TODO: try
+// TODO: improve this. At the moment this is complete garbage.
 impl StringExtensions for String {
     fn sanitize(&mut self) -> String {
         return self
             .replace(" ", "-")
+            .replace("$", "")
+            .replace("!", "-")
             .replace(",", "")
             .replace(":", "")
             .replace("(", "")
@@ -132,14 +134,18 @@ impl StringExtensions for String {
             .replace("‘", "")
             .replace("`", "")
             .replace("`", "")
+            .replace("’", "")
+            .replace("\"", "")
             .replace("…", "")
             .replace("...", "")
             .replace("<", "")
             .replace(">", "")
             .replace("&", "")
+            .replace("/", "-")
             .replace("--", "-")
             .replace("--", "-")
-            .replace("--", "-");
+            .replace("--", "-")
+            .replace("-.", ".");
     }
 }
 
@@ -238,7 +244,15 @@ fn main() {
             }
 
             if Path::new(&outfile).exists() {
-                continue;
+                let metadata = std::fs::metadata(&outfile);
+                match metadata {
+                    Ok(m) => {
+                        if m.len() != 0 {
+                            continue;
+                        }
+                    },
+                    Err(_) => {},
+                }
             }
 
             println!("Executing command: `{}`", cmd);
