@@ -197,7 +197,9 @@ fn main() {
 
         // create directory
         let feed_dir = format!("{}/{}", arg_directory, feed_title);
-        std::fs::create_dir(&feed_dir).expect("Directory could not be created.");
+        if !Path::new(&feed_dir).exists() {
+            std::fs::create_dir(&feed_dir).expect("Error while creating directory.");
+        }
 
         let items = feed_item_list
             .iter()
@@ -215,32 +217,38 @@ fn main() {
             println!("Setting found: {:?}", setting);
 
             let cmd: String;
+            let outfile: String;
             match setting {
                 Ok(s) => {
                     if s.cmd == "monolith" {
-                        cmd = format!(
-                            "monolith -{} {} > {}/{}.html",
-                            s.args, url, feed_dir, title
-                        );
+                        outfile = format!("{}/{}.html", feed_dir, title);
+                        cmd = format!("monolith -{} {} > {}", s.args, url, outfile);
                     } else if s.cmd == "lynx" {
-                        cmd = format!("lynx {} -dump > {}/{}.txt", url, feed_dir, title);
+                        outfile = format!("{}/{}.txt", feed_dir, title);
+                        cmd = format!("lynx {} -dump > {}", url, outfile);
                     } else {
-                        cmd = format!("monolith -s {} > {}/{}.html", url, feed_dir, title);
+                        outfile = format!("{}/{}.html", feed_dir, title);
+                        cmd = format!("monolith -s {} > {}", url, outfile);
                     }
                 },
                 Err(_) => {
-                    cmd = format!("monolith -s {} > {}/{}.html", url, feed_dir, title);
+                    outfile = format!("{}/{}.html", feed_dir, title);
+                    cmd = format!("monolith -s {} > {}", url, outfile);
                 }
             }
 
-            println!("Command to execute: {}", cmd);
+            if Path::new(&outfile).exists() {
+                continue;
+            }
+
+            println!("Executing command: `{}`", cmd);
 
             // use `output()` to block
             std::process::Command::new("sh")
                 .arg("-c")
                 .arg(cmd)
                 .output()
-                .expect("Failed to execute monolith.");
+                .expect("Failed to execute command.");
         }
     }
 }
