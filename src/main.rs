@@ -20,10 +20,14 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
-fn get_blacklist() -> Vec<String> {
+fn get_blacklist(fpath: &str) -> Vec<String> {
     let mut list: Vec<String> = vec![];
 
-    if let Ok(lines) = read_lines("blacklist.conf") {
+    if fpath == "" {
+        return list;
+    }
+
+    if let Ok(lines) = read_lines(&fpath) {
         for line in lines {
             if let Ok(content) = line {
                 list.push(content);
@@ -177,6 +181,14 @@ fn main() {
                 .help("Settings file")
                 .takes_value(true),
         )
+        .arg(
+            clap::Arg::with_name("Blacklist")
+                .short("b")
+                .long("blacklist")
+                .value_name("FILE")
+                .help("Blacklist file")
+                .takes_value(true),
+        )
         .get_matches();
 
     let arg_db = args.value_of("File").expect("File argument not valid!");
@@ -184,6 +196,7 @@ fn main() {
         .value_of("Output")
         .expect("Directory argument is not valid!");
     let arg_setting = args.value_of("Settings").unwrap_or("");
+    let arg_blacklist = args.value_of("Blacklist").unwrap_or("");
 
     let dir_metadata = std::fs::metadata(arg_directory).unwrap();
     if !dir_metadata.is_dir() {
@@ -191,7 +204,7 @@ fn main() {
     }
 
     // get lists
-    let blacklist = get_blacklist();
+    let blacklist = get_blacklist(&arg_blacklist);
     let settings = get_settings(&arg_setting);
 
     // e.g.: /home/user/.local/share/newsboat/cache.db
