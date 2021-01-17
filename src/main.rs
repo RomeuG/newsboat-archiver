@@ -1,21 +1,16 @@
 mod feed;
 mod feeditem;
+mod setting;
 
 use feed::*;
 use feeditem::*;
+use setting::*;
 
 use sqlite;
 
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-
-#[derive(Debug, Clone)]
-struct Setting {
-    cmd: String,
-    url: String,
-    args: String,
-}
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where
@@ -39,8 +34,12 @@ fn get_blacklist() -> Vec<String> {
     return list;
 }
 
-fn get_settings() -> Vec<Setting> {
+fn get_settings(fpath: &str) -> Vec<Setting> {
     let mut list: Vec<Setting> = vec![];
+
+    if fpath == "" {
+        return list;
+    }
 
     if let Ok(lines) = read_lines("settings.conf") {
         for line in lines {
@@ -170,12 +169,21 @@ fn main() {
                 .help("Output directory")
                 .takes_value(true),
         )
+        .arg(
+            clap::Arg::with_name("Settings")
+                .short("s")
+                .long("settings")
+                .value_name("FILE")
+                .help("Settings file")
+                .takes_value(true),
+        )
         .get_matches();
 
     let arg_db = args.value_of("File").expect("File argument not valid!");
     let arg_directory = args
         .value_of("Output")
         .expect("Directory argument is not valid!");
+    let arg_setting = args.value_of("Setting").unwrap_or("");
 
     let dir_metadata = std::fs::metadata(arg_directory).unwrap();
     if !dir_metadata.is_dir() {
@@ -184,7 +192,7 @@ fn main() {
 
     // get lists
     let blacklist = get_blacklist();
-    let settings = get_settings();
+    let settings = get_settings(&arg_setting);
 
     // e.g.: /home/user/.local/share/newsboat/cache.db
     let connection = sqlite::open(arg_db).unwrap();
