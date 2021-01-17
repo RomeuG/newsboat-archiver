@@ -41,7 +41,7 @@ fn get_settings(fpath: &str) -> Vec<Setting> {
         return list;
     }
 
-    if let Ok(lines) = read_lines("settings.conf") {
+    if let Ok(lines) = read_lines(&fpath) {
         for line in lines {
             if let Ok(content) = line {
                 let split = content.split("|").collect::<Vec<_>>();
@@ -183,7 +183,7 @@ fn main() {
     let arg_directory = args
         .value_of("Output")
         .expect("Directory argument is not valid!");
-    let arg_setting = args.value_of("Setting").unwrap_or("");
+    let arg_setting = args.value_of("Settings").unwrap_or("");
 
     let dir_metadata = std::fs::metadata(arg_directory).unwrap();
     if !dir_metadata.is_dir() {
