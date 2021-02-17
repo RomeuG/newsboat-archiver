@@ -11,6 +11,7 @@ use sqlite;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
+use std::process::Command;
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where
@@ -152,7 +153,31 @@ impl StringExtensions for String {
     }
 }
 
+fn is_program_in_path(program: &str) -> bool {
+    if let Ok(path) = std::env::var("PATH") {
+        for p in path.split(":") {
+            let p_str = format!("{}/{}", p, program);
+            if std::fs::metadata(p_str).is_ok() {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 fn main() {
+    // verify if commands are in $PATH
+    if !is_program_in_path("monolith") {
+        println!("Monolith was not found in the system.");
+        std::process::exit(1);
+    }
+
+    if !is_program_in_path("lynx") {
+        println!("Lynx was not found in the system.");
+        std::process::exit(1);
+    }
+
     let args = clap::App::new("newsboat-archiver")
         .version("1.0")
         .author("Romeu Vieira <romeu.bizz@gmail.com>")
@@ -241,10 +266,10 @@ fn main() {
 
             let url = item.url.as_ref().unwrap();
             let setting = get_setting_from_url(&url, &settings);
-            println!("Setting found: {:?}", setting);
 
             let cmd: String;
             let outfile: String;
+
             match setting {
                 Ok(s) => {
                     if s.cmd == "monolith" {
