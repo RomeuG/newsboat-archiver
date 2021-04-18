@@ -106,7 +106,7 @@ fn is_url_in_blacklist<'a>(url: &'a str, list: &[String]) -> bool {
     return false;
 }
 
-fn get_setting_from_url<'a>(url: &str, list: &'a[Setting]) -> Result<&'a Setting, ()> {
+fn get_setting_from_url<'a>(url: &str, list: &'a [Setting]) -> Result<&'a Setting, ()> {
     for setting in list {
         if url.contains(&setting.url) {
             return Ok(&setting);
@@ -282,7 +282,7 @@ fn main() {
                         outfile = format!("{}/{}.html", feed_dir, title);
                         cmd = format!("monolith -s {} > {}", url, outfile);
                     }
-                },
+                }
                 Err(_) => {
                     outfile = format!("{}/{}.html", feed_dir, title);
                     cmd = format!("monolith -s {} > {}", url, outfile);
@@ -296,8 +296,8 @@ fn main() {
                         if m.len() != 0 {
                             continue;
                         }
-                    },
-                    Err(_) => {},
+                    }
+                    Err(_) => {}
                 }
             }
 
